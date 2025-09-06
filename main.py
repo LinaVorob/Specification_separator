@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List
 
 from logger import LoggerFile
-from config.config import PROJECT_PATH, WORK_FORMATS, LOG_FILE_NAME
+from config.config import PROJECT_PATH, WORK_FORMATS, LOG_FILE_NAME, FINAL_FILE_NAME, NOT_NEED_COLUMNS
 from excel import ExcelInput, ExcelOutput
 from exceptions import IncorrectColumns
 
@@ -22,7 +22,7 @@ class Main:
             - Prints "No Excel files found..." message if no files are present
             - Displays enumerated list of available files with indices
         """
-        files = [f for f in PROJECT_PATH.iterdir() if f.suffix in WORK_FORMATS]
+        files = [f for f in PROJECT_PATH.iterdir() if f.suffix in WORK_FORMATS and not f.name.endswith(FINAL_FILE_NAME)]
         return files
 
     def main(self):
@@ -33,6 +33,7 @@ class Main:
             try:
                 input_handler.read_excel_file(excel_file)
                 input_handler.fix_origin_file()
+                input_handler.delete_columns(NOT_NEED_COLUMNS)
                 output_handler.relative_content = input_handler.get_data()
                 output_handler.write_excel_file(excel_file, input_handler.get_data())
             except IncorrectColumns:

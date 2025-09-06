@@ -15,7 +15,8 @@ class LoggerFile:
             cls._instance = super(LoggerFile, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, name: str = __name__, log_file: str = "app.txt", level=logging.INFO):
+    def __init__(self, name: str = __name__, log_file: str = "app.txt",
+                 console_level=logging.DEBUG, file_level=logging.INFO):
         """
         Initialize the logger with a name, log file path, and logging level.
 
@@ -26,14 +27,15 @@ class LoggerFile:
         """
         self.name: str = name
         self.log_file: Path = PROJECT_PATH / log_file
-        self.level: int = level
+        self.console_level: int = console_level
+        self.file_level: int = file_level
         self.logger: logging.Logger = logging.getLogger(name)
         self.check_file_exists()
         self._setup_logger()
 
     def _setup_logger(self):
         """Configure the logger to write to console and file with the specified format."""
-        self.logger.setLevel(self.level)
+        self.logger.setLevel(logging.DEBUG)
 
         # Create a formatter for the log messages
         formatter = logging.Formatter(
@@ -42,10 +44,12 @@ class LoggerFile:
 
         # File handler to write logs to a file
         file_handler = logging.FileHandler(self.log_file)
+        file_handler.setLevel(self.file_level)
         file_handler.setFormatter(formatter)
 
         # Console handler to output logs to the terminal
         console_handler = logging.StreamHandler()
+        console_handler.setLevel(self.console_level)
         console_handler.setFormatter(formatter)
 
         # Add handlers to the logger
