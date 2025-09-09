@@ -11,6 +11,7 @@ from typing import Tuple, Union, List, Dict
 
 import numpy as np
 import pandas as pd
+from openpyxl.styles import Alignment, Font
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -28,16 +29,18 @@ class ExcelOutput:
         self.absolute_content: pd.DataFrame = None
         self.logger = None
 
-    def write_excel_file(self, file_name: Path, file_original_contents: pd.DataFrame, details: Dict[str, Union[AssemblyUnit, SpecificationEntity]]) -> None:
+    def write_excel_file(self, file_name: Path, details: Dict[str, Union[AssemblyUnit, SpecificationEntity]]) -> None:
         self.logger = LoggerFile(name=LOG_FILE_NAME.format(file_name.name.split('.')[0])).get_logger()
         name = f'{file_name.name.rsplit('.', 1)[0]}{FINAL_FILE_NAME}'
         absolute_content = self.create_absolute_sheet(details)
         with pd.ExcelWriter(name, mode="w", engine="openpyxl") as writer:
-            file_original_contents.to_excel(writer, sheet_name=RELATIVE_SHEET_NAME, index=False)
+            self.relative_content.to_excel(writer, sheet_name=RELATIVE_SHEET_NAME, index=False)
             absolute_content.to_excel(writer, sheet_name=ABSOLUTE_SHEET_NAME, index=False)
             self.set_recalculation_count(writer)
+            self.set_formating_for_relative(writer.book[RELATIVE_SHEET_NAME])
+            self.set_formating_for_absolute(writer.book[ABSOLUTE_SHEET_NAME])
 
-    def set_recalculation_count(self, writer):
+    def set_recalculation_count(self, writer) -> None:
         wb: Workbook = writer.book
         worksheet: Worksheet = wb[ABSOLUTE_SHEET_NAME]
         worksheet.insert_rows(0, 1)
@@ -72,6 +75,66 @@ class ExcelOutput:
             }, inplace=True
         )
         return absolute_content
+
+    def format_sheet(self, worksheet: Worksheet, title_row_number: int = 1) -> None:
+        """
+        Apply formatting to a worksheet:
+        - Wrap text in all cells
+        - Set column widths
+        - Make the first row bold if title_row is True
+        """
+        # Set column widths
+        column_widths = {
+            'A': 30,
+            'B': 30,
+            'C': 25,
+            'D': 25,
+            'E': 20,
+            'F': 20,
+            'G': 15,
+            'H': 15,
+            'I': 15,
+        }
+        for col, width in column_widths.items():
+            worksheet.column_dimensions[col].width = width
+
+        # Wrap text in all cells
+        for row in worksheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True)
+
+        # Make the first row bold
+        for cell in worksheet[title_row_number]:
+            cell.font = Font(bold=True)
+
+    def set_formating_for_absolute(self, worksheet: Worksheet = None):
+        self.format_sheet(worksheet, 2)
+
+    def set_formating_for_relative(self, worksheet: Worksheet = None):
+        self.format_sheet(worksheet)
+        details = [assembly_unit for assembly_unit in self.absolute_content if isinstance(assembly_unit, AssemblyUnit)]
+        for assembly_unit in details:
+            self.create_group(worksheet, assembly_unit)
+
+    def create_group(self, worksheet: Worksheet, assembly_unit: AssemblyUnit, outline_level: int = 1) -> None:
+        if assembly_unit.components:
+            row_number_first = '.'.join([str(number_item) for number_item in assembly_unit.components[0].number])
+            row_number_last = '.'.join([str(number_item) for number_item in assembly_unit.components[-1].number])
+            row_start = -1
+            row_end = -1
+            for row in worksheet.iter_rows(min_row=2, max_col=1):
+                if row[0].value == row_number_first:
+                    row_start = row[0].row
+                elif row[0].value == row_number_last:
+                    row_end = row[0].row
+                if row_start != -1 and row_end != -1:
+                    if row_start < row_end:
+                        worksheet.row_dimensions.group(row_start, row_end, hidden=True, outline_level=outline_level)
+                        break
+
+            for component in assembly_unit.components:
+                if component.detail_type == DetailTypes.assembly_unit:
+                    self.create_group(worksheet, component, outline_level + 1)
 
 
 class ExcelInput:

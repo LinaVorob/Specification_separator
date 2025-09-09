@@ -34,7 +34,9 @@ class Main:
                 input_handler.read_excel_file(excel_file)
                 input_handler.work_with_rows()
                 input_handler.delete_columns(NOT_NEED_COLUMNS)
-                output_handler.write_excel_file(excel_file, input_handler.get_data(), input_handler.counter_unique_models)
+                output_handler.relative_content = input_handler.get_data()
+                output_handler.absolute_content = input_handler.models
+                output_handler.write_excel_file(excel_file, input_handler.counter_unique_models)
             except IncorrectColumns:
                 logger.error('Файл не соответствует формату. Пропуск.')
                 continue
