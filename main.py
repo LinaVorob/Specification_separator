@@ -32,10 +32,11 @@ class Main:
             logger = LoggerFile(log_file=LOG_FILE_NAME.format(excel_file.name.split('.')[0])).get_logger()
             try:
                 input_handler.read_excel_file(excel_file)
-                input_handler.fix_origin_file()
+                input_handler.work_with_rows()
                 input_handler.delete_columns(NOT_NEED_COLUMNS)
                 output_handler.relative_content = input_handler.get_data()
-                output_handler.write_excel_file(excel_file, input_handler.get_data())
+
+                output_handler.write_excel_file(excel_file, input_handler.get_data(), input_handler.models)
             except IncorrectColumns:
                 logger.error('Файл не соответствует формату. Пропуск.')
                 continue

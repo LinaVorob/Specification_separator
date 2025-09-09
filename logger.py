@@ -43,8 +43,8 @@ class LoggerFile:
         )
 
         # File handler to write logs to a file
-        file_handler = logging.FileHandler(self.log_file)
-        file_handler.setLevel(self.file_level)
+        file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
+        file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
 
         # Console handler to output logs to the terminal
@@ -68,13 +68,3 @@ class LoggerFile:
                 path.mkdir(parents=True)
         if not self.log_file.exists():
             self.log_file.touch()
-
-
-# Example usage
-if __name__ == "__main__":
-    logger = LoggerFile(log_file=f"logs/app_{datetime.now().strftime('%Y%m%d')}.txt").get_logger()
-    logger.debug("This is a debug message.")
-    logger.info("This is an info message.")
-    logger.warning("This is a warning message.")
-    logger.error("This is an error message.")
-    logger.critical("This is a critical message.")
