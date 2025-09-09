@@ -3,13 +3,18 @@ Excel File Handler Module
 
 Provides functionality for listing and interacting with Excel files in the current directory.
 """
+import copy
+from dataclasses import asdict
+from idlelib.iomenu import errors
 from pathlib import Path
-from typing import Tuple, Union, List
+from typing import Tuple, Union, List, Dict
 
 import numpy as np
 import pandas as pd
+from openpyxl.workbook import Workbook
+from openpyxl.worksheet.worksheet import Worksheet
 
-from config.config import NECESSARY_COLUMNS, FINAL_FILE_NAME, LOG_FILE_NAME, RELATIVE_SHEET_NAME
+from config.config import NECESSARY_COLUMNS, FINAL_FILE_NAME, LOG_FILE_NAME, RELATIVE_SHEET_NAME, ABSOLUTE_SHEET_NAME
 from exceptions import IncorrectColumns, IncorrectRow
 from logger import LoggerFile
 from models import DetailTypes, AssemblyUnit, SpecificationEntity
@@ -23,21 +28,50 @@ class ExcelOutput:
         self.absolute_content: pd.DataFrame = None
         self.logger = None
 
-    def write_excel_file(self, file_name: Path, file_original_contents: pd.DataFrame, details: List[Union[AssemblyUnit, SpecificationEntity]]) -> None:
+    def write_excel_file(self, file_name: Path, file_original_contents: pd.DataFrame, details: Dict[str, Union[AssemblyUnit, SpecificationEntity]]) -> None:
         self.logger = LoggerFile(name=LOG_FILE_NAME.format(file_name.name.split('.')[0])).get_logger()
         name = f'{file_name.name.rsplit('.', 1)[0]}{FINAL_FILE_NAME}'
-        self.create_relative_sheet(name, file_original_contents)
-
-
-    def create_sheet(self, sheet_name: str):
-        ...
-
-    def create_absolute_sheet(self):
-        ...
-
-    def create_relative_sheet(self, name, file_contents):
+        absolute_content = self.create_absolute_sheet(details)
         with pd.ExcelWriter(name, mode="w", engine="openpyxl") as writer:
-            file_contents.to_excel(writer, sheet_name=RELATIVE_SHEET_NAME, index=False)
+            file_original_contents.to_excel(writer, sheet_name=RELATIVE_SHEET_NAME, index=False)
+            absolute_content.to_excel(writer, sheet_name=ABSOLUTE_SHEET_NAME, index=False)
+            self.set_recalculation_count(writer)
+
+    def set_recalculation_count(self, writer):
+        wb: Workbook = writer.book
+        worksheet: Worksheet = wb[ABSOLUTE_SHEET_NAME]
+        worksheet.insert_rows(0, 1)
+        worksheet['A1'] = 'Количество приборов:'
+        worksheet['B1'] = 1
+        for row_number, row in enumerate(worksheet.rows):
+            if row_number < 2:
+                continue
+
+            formula = f'=B1*{row[7].value}'
+            worksheet[f'H{row_number + 1}'] = formula
+
+
+    def create_absolute_sheet(self, details: Dict[str, Union[AssemblyUnit, SpecificationEntity]]) -> pd.DataFrame:
+        absolute_content = pd.DataFrame([asdict(detail) for detail in details.values()])
+        absolute_content = absolute_content.drop(columns=['number', 'components', 'amount'])
+        absolute_content['detail_type'] = absolute_content['detail_type'].map(lambda x: x.value)
+        absolute_content = absolute_content.sort_values(by=['detail_type', 'name']).reset_index(drop=True)
+        new_order = ["name", 'code', 'work_file', 'detail_type', 'making_type', 'material', 'is_order', 'count_in_device', 'comment']
+        absolute_content = absolute_content[new_order]
+        absolute_content.rename(
+            columns={
+                "detail_type": "Раздел",
+                "name": "Наименование",
+                "making_type": "Способ изготовления",
+                "material": "Материал",
+                "comment": "Примечание",
+                "is_order": "Заказ на стороне",
+                "count_in_device": "Количество в приборе",
+                "work_file": "Имя_рабочего_файла",
+                "code": "Обозначение"
+            }, inplace=True
+        )
+        return absolute_content
 
 
 class ExcelInput:
@@ -99,7 +133,7 @@ class ExcelInput:
                 self.logger.error(str(err))
                 continue
         else:
-            self.file_contents = self.file_contents.drop(self.empty_index).reset_index(drop=True)
+            self.file_contents = self.file_contents.drop(self.empty_index, errors='ignore').reset_index(drop=True)
 
     def check_row_number(self, row: pd.Series) -> None:
         """
@@ -155,7 +189,7 @@ class ExcelInput:
         :param columns: columns to delete
         """
         self.logger.debug('Delete columns')
-        self.file_contents = self.file_contents.drop(columns=list(columns)).reset_index(drop=True)
+        self.file_contents = self.file_contents.drop(columns=list(columns), errors='ignore').reset_index(drop=True)
 
     def replace_spaces_to_none(self):
         """
@@ -181,7 +215,7 @@ class ExcelInput:
         """
         if pd.isna(row.iloc[4]):
             raise IncorrectRow('Не указан тип детали')
-        if row.iloc[4].lower() == DetailTypes.assembly_unit.value:
+        if row.iloc[4].lower() == DetailTypes.assembly_unit.value.lower() or row.iloc[4].lower() == DetailTypes.assembly_unit_2.value.lower():
             model = AssemblyUnit(
                 number=[int(number) for number in row.iloc[0].split('.')],
                 components=list(),
@@ -204,8 +238,10 @@ class ExcelInput:
                 count_in_device=float(row.iloc[8])
             )
 
+
         result = self.find_assembly(self.models, model)
         if not result:
+            self.counter_unique_models[model.name] = copy.deepcopy(model)
             self.models.append(model)
 
     def find_assembly(self, models_collection: List[Union[AssemblyUnit,SpecificationEntity]], model: Union[AssemblyUnit, SpecificationEntity], amount_upper: float = 1) -> bool:
@@ -213,7 +249,12 @@ class ExcelInput:
             if isinstance(component, AssemblyUnit):
                 if component.is_detail_in_assembly(model):
                     component.components.append(model)
-                    self.counter_unique_models[model.name] = self.counter_unique_models.get(model.name, 0) +  component.count_in_device * amount_upper * model.amount
+                    if self.counter_unique_models.get(model.name) is None:
+                        self.counter_unique_models[model.name] = copy.deepcopy(model)
+                        self.counter_unique_models[model.name].count_in_device = component.count_in_device * amount_upper * model.amount
+
+                    else:
+                        self.counter_unique_models[model.name].count_in_device = self.counter_unique_models[model.name].count_in_device + component.count_in_device * amount_upper * model.amount
                     return True
                 else:
                     if self.find_assembly(component.components, model, amount_upper=component.count_in_device):
