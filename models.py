@@ -40,7 +40,7 @@ class DetailNumeration:
 
 @dataclass
 class SpecificationEntity:
-    number: List[int] #DetailNumeration
+    number: List[int]
     name: str
     detail_type: DetailTypes
     code: Optional[str] = None
@@ -57,6 +57,12 @@ class SpecificationEntity:
 class AssemblyUnit:
     number: List[int]
     name: str
+    code: Optional[str] = None
+    work_file: Optional[str] = None
+    making_type: Optional[str] = None
+    material: Optional[str] = None
+    comment: Optional[str] = None
+    is_order: bool = False
     components: List[Union[SpecificationEntity, "AssemblyUnit"]] | None = None
     detail_type: DetailTypes = DetailTypes.assembly_unit
     amount: float = 0.0

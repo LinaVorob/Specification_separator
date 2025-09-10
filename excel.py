@@ -5,7 +5,6 @@ Provides functionality for listing and interacting with Excel files in the curre
 """
 import copy
 from dataclasses import asdict
-from idlelib.iomenu import errors
 from pathlib import Path
 from typing import Tuple, Union, List, Dict
 
@@ -15,7 +14,7 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
-from config.config import NECESSARY_COLUMNS, FINAL_FILE_NAME, LOG_FILE_NAME, RELATIVE_SHEET_NAME, ABSOLUTE_SHEET_NAME
+from config import NECESSARY_COLUMNS, FINAL_FILE_NAME, LOG_FILE_NAME, RELATIVE_SHEET_NAME, ABSOLUTE_SHEET_NAME
 from exceptions import IncorrectColumns, IncorrectRow
 from logger import LoggerFile
 from models import DetailTypes, AssemblyUnit, SpecificationEntity
@@ -39,6 +38,7 @@ class ExcelOutput:
             self.set_recalculation_count(writer)
             self.set_formating_for_relative(writer.book[RELATIVE_SHEET_NAME])
             self.set_formating_for_absolute(writer.book[ABSOLUTE_SHEET_NAME])
+        self.logger.info(f'Создан файл: {name}')
 
     def set_recalculation_count(self, writer) -> None:
         wb: Workbook = writer.book
@@ -260,17 +260,6 @@ class ExcelInput:
         """
         self.file_contents = self.file_contents.replace(r'^\s*$', np.nan, regex=True)
 
-    # def fix_row_number_sequence(self):
-    #     """
-    #     Fix row number sequence. Fix an error, when row number after nine set to one
-    #     """
-    #     for index in range(1, len(self.file_contents)):
-    #         if index > 0:
-    #             if self.file_contents.iloc[index - 1, 0][:-1] == self.file_contents.iloc[index, 0][:-1]:
-    #                 self.file_contents.iloc[index, 0] = self.file_contents.iloc[index - 1, 0].replace('0', '1')
-    #
-    #                 if self.file_contents.iloc[index - 1, 0].endswith('9') and not self.file_contents.iloc[index, 0].endswith('0'):
-
     def collect_model(self, row: pd.Series) -> None:
         """
         Converte data into model and collect it from file
@@ -284,6 +273,12 @@ class ExcelInput:
                 components=list(),
                 amount=float(row.iloc[8]),
                 name=row.iloc[1].strip(),
+                code=row.iloc[2],
+                work_file=row.iloc[3],
+                material=row.iloc[6],
+                making_type=row.iloc[5],
+                comment=row.iloc[9],
+                is_order=row.iloc[7],
                 count_in_device=float(row.iloc[8])
             )
         else:
