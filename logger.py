@@ -1,8 +1,7 @@
 import logging
-from datetime import datetime
 from pathlib import Path
 
-from config.config import PROJECT_PATH
+from config import PROJECT_PATH
 
 
 class LoggerFile:
@@ -26,7 +25,7 @@ class LoggerFile:
             level (int): Logging level (e.g., logging.DEBUG, logging.INFO).
         """
         self.name: str = name
-        self.log_file: Path = PROJECT_PATH / log_file
+        self.log_file: Path = Path.cwd() / log_file
         self.console_level: int = console_level
         self.file_level: int = file_level
         self.logger: logging.Logger = logging.getLogger(name)
