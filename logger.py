@@ -1,9 +1,6 @@
 import logging
 from pathlib import Path
 
-from config import PROJECT_PATH
-
-
 class LoggerFile:
     """Class for setting up and managing logging to both console and file."""
     _instance = None  # Class-level variable to store the singleton instance

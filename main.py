@@ -10,28 +10,29 @@ from exceptions import IncorrectColumns
 class Main:
     @staticmethod
     def list_excel_files() -> List[Path]:
-        """List all Excel files (.xlsx, .xls) in the current directory.
+        """
+        Возвращает список всех подходящих Excel-файлов в директории проекта.
 
-        Scans the working directory for files with .xlsx or .xls extensions,
-        displays enumerated results, and returns the list of matching files.
+        Файлы должны соответствовать разрешениям из `WORK_FORMATS` и не содержать `FINAL_FILE_NAME` в названии.
 
         Returns:
-            list[str] | None: List of Excel file names if found, otherwise None
-
-        Notes:
-            - Prints "No Excel files found..." message if no files are present
-            - Displays enumerated list of available files with indices
+            List[Path]: Список путей к файлам.
         """
-        print(PROJECT_PATH)
-        print(Path.cwd())
         files = [f for f in PROJECT_PATH.iterdir() if f.suffix in WORK_FORMATS and not f.name.endswith(FINAL_FILE_NAME)]
-        print('files ', files)
         return files
 
     def main(self):
+        """
+        Основной метод приложения.
+
+        Обрабатывает все найденные Excel-файлы, читает их, преобразует данные, формирует выходные файлы,
+        и применяет логирование процессов.
+        """
         input_handler = ExcelInput()
         output_handler = ExcelOutput()
         for excel_file in self.list_excel_files():
+            input_handler.clear_content()
+            output_handler.clear_content()
             logger = LoggerFile(log_file=LOG_FILE_NAME.format(excel_file.name.split('.')[0])).get_logger()
             logger.info(str(PROJECT_PATH))
             try:

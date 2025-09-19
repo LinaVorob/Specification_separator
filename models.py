@@ -4,8 +4,11 @@ from typing import List, Union, Optional
 
 from exceptions import IncorrectRow
 
-# TODO Обсудить с Владом разные варианты обозначения сброчных единиц
 class DetailTypes(str, Enum):
+    """
+    Типы деталей
+    """
+
     detail = 'Детали'
     assembly_unit = 'Сборочные единицы'
     assembly_unit_2 = 'Сборочные изделия'
@@ -21,25 +24,13 @@ class DetailTypes(str, Enum):
         else:
            raise IncorrectRow(f'Неизвестный тип детали {type_name}')
 
-class DetailNumeration:
-
-    def __init__(self, number: str):
-        number_parts = number.split('.')
-        if len(number_parts) < 6:
-            number_parts.extend([None] * (6 - len(number_parts)))
-        self.main_number: int = int(number_parts[0]) if number_parts[0] else None
-        self.second_level_number: int | None = int(number_parts[1]) if number_parts[1] else None
-        self.third_level_number: int | None = int(number_parts[2]) if number_parts[2] else None
-        self.forth_level_number: int | None = int(number_parts[3]) if number_parts[3] else None
-        self.fifth_level_number: int | None = int(number_parts[4]) if number_parts[4] else None
-        self.sixth_level_number: int | None = int(number_parts[5]) if number_parts[5] else None
-
-    def __len__(self):
-        return len([item for item in self.__dict__.values() if item is not None])
-
 
 @dataclass
 class SpecificationEntity:
+    """
+    Модель детали
+    """
+
     number: List[int]
     name: str
     detail_type: DetailTypes
@@ -55,6 +46,10 @@ class SpecificationEntity:
 
 @dataclass
 class AssemblyUnit:
+    """
+    Модель сборочной единицы
+    """
+
     number: List[int]
     name: str
     code: Optional[str] = None

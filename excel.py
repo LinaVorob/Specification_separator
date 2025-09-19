@@ -21,14 +21,33 @@ from models import DetailTypes, AssemblyUnit, SpecificationEntity
 
 
 class ExcelOutput:
-    """Class for handling Excel file operations in the current working directory."""
+    """
+    Класс для обработки выходных Excel-файлов.
 
+    Отвечает за создание и форматирование таблиц Excel: относительная и абсолютная ведомости.
+    """
     def __init__(self):
         self.relative_content: pd.DataFrame = None
         self.absolute_content: pd.DataFrame = None
         self.logger = None
 
+    def clear_content(self) -> None:
+        """
+        Очистка содержимого данных.
+
+        Сбрасывает значения атрибутов `relative_content` и `absolute_content`.
+        """
+        self.relative_content: pd.DataFrame = None
+        self.absolute_content: pd.DataFrame = None
+
     def write_excel_file(self, file_name: Path, details: Dict[str, Union[AssemblyUnit, SpecificationEntity]]) -> None:
+        """
+        Создаёт и сохраняет Excel-файл с данными из переданного словаря деталей.
+
+        Args:
+            file_name (Path): Путь к исходному файлу, на основе которого будет создан новый Excel-файл.
+            details (Dict[str, Union[AssemblyUnit, SpecificationEntity]]): Словарь деталей.
+        """
         self.logger = LoggerFile(name=LOG_FILE_NAME.format(file_name.name.split('.')[0])).get_logger()
         name = f'{file_name.name.rsplit('.', 1)[0]}{FINAL_FILE_NAME}'
         absolute_content = self.create_absolute_sheet(details)
@@ -41,6 +60,14 @@ class ExcelOutput:
         self.logger.info(f'Создан файл: {name}')
 
     def set_recalculation_count(self, writer) -> None:
+        """
+        Устанавливает формулы для автоматического расчёта количества в приборе.
+
+        Вставляет строку с количеством приборов и применяет формулы для подсчёта общего количества деталей.
+
+        Args:
+            writer: Объект ExcelWriter для записи данных в Excel-файл.
+        """
         wb: Workbook = writer.book
         worksheet: Worksheet = wb[ABSOLUTE_SHEET_NAME]
         worksheet.insert_rows(0, 1)
@@ -55,6 +82,15 @@ class ExcelOutput:
 
 
     def create_absolute_sheet(self, details: Dict[str, Union[AssemblyUnit, SpecificationEntity]]) -> pd.DataFrame:
+        """
+        Создаёт таблицу абсолютной спецификации из переданных данных.
+
+        Args:
+            details (Dict[str, Union[AssemblyUnit, SpecificationEntity]]): Словарь деталей.
+
+        Returns:
+            pd.DataFrame: Отформатированная таблица абсолютной спецификации.
+        """
         absolute_content = pd.DataFrame([asdict(detail) for detail in details.values()])
         absolute_content = absolute_content.drop(columns=['number', 'components', 'amount'])
         absolute_content['detail_type'] = absolute_content['detail_type'].map(lambda x: x.value)
@@ -78,10 +114,13 @@ class ExcelOutput:
 
     def format_sheet(self, worksheet: Worksheet, title_row_number: int = 1) -> None:
         """
-        Apply formatting to a worksheet:
-        - Wrap text in all cells
-        - Set column widths
-        - Make the first row bold if title_row is True
+        Применяет форматирование к листу Excel.
+
+        Устанавливает ширину столбцов, включает перенос текста в ячейках и делает заголовок жирным.
+
+        Args:
+            worksheet (Worksheet): Лист Excel для форматирования.
+            title_row_number (int): Номер строки заголовка.
         """
         # Set column widths
         column_widths = {
@@ -108,15 +147,35 @@ class ExcelOutput:
             cell.font = Font(bold=True)
 
     def set_formating_for_absolute(self, worksheet: Worksheet = None):
+        """
+        Применяет форматирование к листу абсолютной спецификации.
+
+        Args:
+            worksheet (Worksheet): Лист Excel для форматирования.
+        """
         self.format_sheet(worksheet, 2)
 
     def set_formating_for_relative(self, worksheet: Worksheet = None):
+        """
+        Применяет форматирование к листу относительной спецификации.
+
+        Args:
+            worksheet (Worksheet): Лист Excel для форматирования.
+        """
         self.format_sheet(worksheet)
         details = [assembly_unit for assembly_unit in self.absolute_content if isinstance(assembly_unit, AssemblyUnit)]
         for assembly_unit in details:
             self.create_group(worksheet, assembly_unit)
 
     def create_group(self, worksheet: Worksheet, assembly_unit: AssemblyUnit, outline_level: int = 1) -> None:
+        """
+        Группирует компоненты сборки на листе Excel.
+
+        Args:
+            worksheet (Worksheet): Лист Excel для группировки.
+            assembly_unit (AssemblyUnit): Объект сборки.
+            outline_level (int): Уровень вложенности.
+        """
         if assembly_unit.components:
             row_number_first = '.'.join([str(number_item) for number_item in assembly_unit.components[0].number])
             row_number_last = '.'.join([str(number_item) for number_item in assembly_unit.components[-1].number])
@@ -138,9 +197,14 @@ class ExcelOutput:
 
 
 class ExcelInput:
+    """
+    Класс для обработки входных Excel-файлов.
+
+    Отвечает за чтение, проверку и предварительную обработку данных из Excel-файлов.
+    """
+
     def __init__(self):
         self.file_contents = None
-        self.fixed_content = None
         self.logger = None
         self.empty_index = list()
         self.models = list()
@@ -148,10 +212,15 @@ class ExcelInput:
 
     def read_excel_file(self, file_name: Path) -> pd.DataFrame:
         """
-        Read Excel file
-        :param file_name: file name
-        :return: DataFrame with file contents
+        Читает данные из Excel-файла.
+
+        Args:
+            file_name (Path): Путь к Excel-файлу.
+
+        Returns:
+            pd.DataFrame: Содержимое файла в виде DataFrame.
         """
+
         engine = 'xlrd'
         if file_name.suffix == ".xlsx":
             engine = 'openpyxl'
@@ -165,7 +234,9 @@ class ExcelInput:
 
     def delete_word_break(self) -> None:
         """
-        Delete word breaks from headers
+        Удаляет символы переноса строки из заголовков столбцов.
+
+        Перезаписывает заголовки, заменяя символы `\n` на пустую строку.
         """
         self.logger.debug('Delete word breaks from headers')
         for column in self.file_contents.columns:
@@ -173,10 +244,14 @@ class ExcelInput:
                 correct_name = column.replace('\n', '')
                 self.file_contents = self.file_contents.rename(columns={column: correct_name})
 
-    def get_count_of_parts(self):
-        ...
-
     def fix_row(self, index: int, row: pd.Series) -> None:
+        """
+        Выполняет исправление строки.
+
+        Args:
+            index (int): Индекс строки.
+            row (pd.Series): Строка DataFrame.
+        """
         self.check_row_number(row)
         self.file_contents.iloc[index] = self.check_word_break(row)
         if self.check_empty_row(row):
@@ -184,7 +259,9 @@ class ExcelInput:
 
     def work_with_rows(self) -> None:
         """
-        Do all fixes for file
+        Обрабатывает все строки в DataFrame.
+
+        Вызывает методы проверки и исправления строк.
         """
         self.file_contents.iloc[:, 0] = self.file_contents.iloc[:, 0].astype(str)
 
@@ -200,16 +277,25 @@ class ExcelInput:
 
     def check_row_number(self, row: pd.Series) -> None:
         """
-        Check a row number is not contains commas
-        :param row: row of file
+        Проверяет номер строки.
+
+        Заменяет запятые на точки в первом столбце.
+
+        Args:
+            row (pd.Series): Строка DataFrame.
         """
         self.logger.debug('Check row number')
         row.iloc[0] = row.iloc[0].replace(',', '.')
 
     def check_word_break(self, row: pd.Series) -> pd.Series:
         """
-        Check a row does not contain word breaks
-        :param row: row of file
+        Удаляет символы переноса строки из ячеек строки.
+
+        Args:
+            row (pd.Series): Строка DataFrame.
+
+        Returns:
+            pd.Series: Строка с очищенными ячейками.
         """
         for index, cell in row.items():
             self.logger.debug(f'Check word break in cell {index}')
@@ -222,16 +308,23 @@ class ExcelInput:
 
     def check_empty_row(self, row: pd.Series) -> bool:
         """
-        Check a row is empty
-        :param row: row of file
-        :return: True if row is empty, False otherwise
+        Проверяет, является ли строка пустой.
+
+        Args:
+            row (pd.Series): Строка DataFrame.
+
+        Returns:
+            bool: True, если строка пустая, иначе False.
         """
         self.logger.debug('Check empty row')
         return row.iloc[1:-1].isna().all()
 
     def check_columns_kit(self) -> None:
         """
-        Check if file has all necessary columns
+        Проверяет, содержит ли файл все необходимые столбцы.
+
+        Raises:
+            IncorrectColumns: Если не все необходимые столбцы присутствуют.
         """
         self.logger.debug('Check columns\' kit')
         columns_from_file = [column.lower() for column in self.file_contents.columns]
@@ -241,29 +334,38 @@ class ExcelInput:
 
     def get_data(self) -> pd.DataFrame:
         """
-        Get data from file
-        :return: fixed file contents
+        Возвращает содержимое файла в виде DataFrame.
+
+        Returns:
+            pd.DataFrame: Данные Excel-файла.
         """
         return self.file_contents
 
     def delete_columns(self, columns: Tuple[str, ...]) -> None:
         """
-        Delete columns from file
-        :param columns: columns to delete
+        Удаляет указанные столбцы из DataFrame.
+
+        Args:
+            columns (Tuple[str, ...]): Кортеж с названиями удаляемых столбцов.
         """
         self.logger.debug('Delete columns')
         self.file_contents = self.file_contents.drop(columns=list(columns), errors='ignore').reset_index(drop=True)
 
     def replace_spaces_to_none(self):
         """
-        Replace spaces to None in file contents
+        Заменяет ячейки, содержащие только пробелы, на NaN.
         """
         self.file_contents = self.file_contents.replace(r'^\s*$', np.nan, regex=True)
 
     def collect_model(self, row: pd.Series) -> None:
         """
-        Converte data into model and collect it from file
-        :param row: row of file
+        Собирает модель из строки данных.
+
+        Args:
+            row (pd.Series): Строка DataFrame.
+
+        Raises:
+            IncorrectRow: Если тип детали не указан.
         """
         if pd.isna(row.iloc[4]):
             raise IncorrectRow('Не указан тип детали')
@@ -303,6 +405,17 @@ class ExcelInput:
             self.models.append(model)
 
     def find_assembly(self, models_collection: List[Union[AssemblyUnit,SpecificationEntity]], model: Union[AssemblyUnit, SpecificationEntity], amount_upper: float = 1) -> bool:
+        """
+        Рекурсивный метод для поиска детали в сборке.
+
+        Args:
+            models_collection (List): Список объектов AssemblyUnit или SpecificationEntity.
+            model (Union[AssemblyUnit, SpecificationEntity]): Деталь, которую ищем.
+            amount_upper (float): Количество верхнего уровня, необходимое для расчета общего количества.
+
+        Returns:
+            bool: True, если деталь найдена, иначе False.
+        """
         for component in models_collection:
             if isinstance(component, AssemblyUnit):
                 if component.is_detail_in_assembly(model):
@@ -310,7 +423,6 @@ class ExcelInput:
                     if self.counter_unique_models.get(model.name) is None:
                         self.counter_unique_models[model.name] = copy.deepcopy(model)
                         self.counter_unique_models[model.name].count_in_device = component.count_in_device * amount_upper * model.amount
-
                     else:
                         self.counter_unique_models[model.name].count_in_device = self.counter_unique_models[model.name].count_in_device + component.count_in_device * amount_upper * model.amount
                     return True
@@ -320,4 +432,15 @@ class ExcelInput:
                     else:
                         continue
         return False
+
+    def clear_content(self) -> None:
+        """
+        Очищает содержимое данных.
+
+        Сбрасывает значения атрибутов `file_contents`, `empty_index`, `models` и `counter_unique_models`.
+        """
+        self.file_contents = None
+        self.empty_index = list()
+        self.models = list()
+        self.counter_unique_models = dict()
 
