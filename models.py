@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Union, Optional
-
 from exceptions import IncorrectRow
 
 class DetailTypes(str, Enum):
